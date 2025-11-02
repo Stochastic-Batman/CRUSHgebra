@@ -14,3 +14,12 @@ Check your Python version with `python --version`. If it is not already Python 3
 and install requirements with:
 
 `pip install -r requirements.txt`
+
+## Reasoning and Tutorial
+
+`jupyter.ipynb` is the Jupyter notebook version of all the files combined. It also includes a more in-depth explanation of all the reasoning and decisions made for the scripts. You don’t need anything else to successfully run and use the code functionality of this repository.
+
+## Running Script Version
+
+Run the scripts in this order:
+1. `preprocessing.py` includes... well, downloading and preprocessing the data. It uses `CrushSet` as a custom `DataSet`.
