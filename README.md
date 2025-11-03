@@ -17,9 +17,10 @@ and install requirements with:
 
 ## Reasoning and Tutorial
 
-`jupyter.ipynb` is the Jupyter notebook version of all the files combined. It also includes a more in-depth explanation of all the reasoning and decisions made for the scripts. You don’t need anything else to successfully run and use the code functionality of this repository.
+`jupyter.ipynb` is the Jupyter notebook version of all the files combined. It also includes a more in-depth explanation of all the reasoning and decisions made for the scripts. You don’t need anything else to successfully run and use the code functionality of this repository. If you configured the environment as instructed, make sure your created virtual environment's interpreter is selected as the Jupyter Notebook kernel.
 
 ## Running Script Version
 
 Run the scripts in this order:
 1. `preprocessing.py` includes... well, downloading and preprocessing the data. It uses `CrushSet` as a custom `DataSet`.
+2. `train.py` for training the model. It uses a custom `TwoRabbitsHunter(nn.Module)` to train the model, which has a 2-layer shared body plus two small MLPs - one for regression and one for classification.
