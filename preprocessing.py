@@ -1,11 +1,9 @@
+import os
 import pandas as pd
 from ucimlrepo import fetch_ucirepo
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
-from torch.utils.data import DataLoader
-from CrushSet import CrushSet
-
 
 
 student_performance = fetch_ucirepo(name='Student Performance')
@@ -63,17 +61,12 @@ feature_names = (
 X_train_encoded = pd.DataFrame(X_train_encoded, columns=feature_names, index=X_train.index)
 X_test_encoded = pd.DataFrame(X_test_encoded, columns=feature_names, index=X_test.index)
 
-# Split train into train and validation sets (80/20 split of training data)
-X_train_final, X_val, y_train_final, y_val = train_test_split(X_train_encoded, y_train, test_size=0.2, random_state=95, stratify=y_train['romantic'])
 
-# Create Dataset instances
-train_dataset = CrushSet(X_train_final, y_train_final)
-test_dataset = CrushSet(X_test_encoded, y_test)
-val_dataset = CrushSet(X_val, y_val)
+# not in Jupyter notebook:
+os.makedirs('tmp', exist_ok=True)
 
-# Create DataLoaders
-BS = 32  # yeah, let's go with the default batch size
-
-train_loader = DataLoader(train_dataset, batch_size=BS, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=BS, shuffle=False)
-test_loader = DataLoader(test_dataset, batch_size=BS, shuffle=False)
+# Save processed data for training
+X_train_encoded.to_csv('tmp/X_train_encoded.csv', index=False)
+X_test_encoded.to_csv('tmp/X_test_encoded.csv', index=False)
+y_train.to_csv('tmp/y_train.csv', index=False)
+y_test.to_csv('tmp/y_test.csv', index=False)

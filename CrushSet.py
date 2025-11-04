@@ -13,7 +13,7 @@ class CrushSet(Dataset):
             y: (n_samples, 2) -> targets DataFrame containing both 'G3' and 'romantic' columns
         """
         self.X = torch.FloatTensor(X.values)
-        self.y_grade = torch.FloatTensor(y['G3'].values)
+        self.y_G3 = torch.FloatTensor(y['G3'].values)
         self.y_romantic = torch.LongTensor((y['romantic'] == 'yes').astype(int).values)
 
     def __len__(self):
@@ -21,11 +21,11 @@ class CrushSet(Dataset):
 
     def __getitem__(self, idx):
         """
-        Returns three items: (x_data, y_grade_data, y_romantic_data)
+        Returns three items: (x_data, y_G3_data, y_romantic_data)
 
         Returns:
             x_data: feature vector, shape (n_features,)
-            y_grade_data: grade target (scalar)
+            y_G3_data: grade target (scalar)
             y_romantic_data: romantic status target (0 or 1)
         """
-        return self.X[idx], self.y_grade[idx], self.y_romantic[idx]
+        return self.X[idx], self.y_G3[idx], self.y_romantic[idx]
