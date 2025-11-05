@@ -4,7 +4,7 @@ Can AI predict your grades AND your love life?
 Multi-task deep learning model for simultaneous prediction of student grades (regression) and relationship status (classification) from the UCI Student Performance dataset. Features a shared MLP body with dual task-specific heads, a custom training loop with combined loss functions, and comprehensive evaluation metrics. Built with PyTorch, it learns from student data to predict both academic performance and romantic status. One brain, two tasks, endless possibilities. Because why choose between math and romance?
 
 ## Dataset
-For this project, we use the UCI Student Performance dataset. Instructions on how to obtain the data and the methods and return values available are at https://github.com/uci-ml-repo/ucimlrepo.
+For this project, we use the UCI Student Performance dataset. Instructions on how to obtain the data and the methods and return values available are at https://github.com/uci-ml-repo/ucimlrepo. As the dataset is quite small for neural networks (649 entries), do not expect great performance.
 
 ## Setup
 Check your Python version with `python --version`. If it is not already Python 3.14, set it to 3.14. Then create a virtual environment with:
@@ -23,4 +23,5 @@ and install requirements with:
 
 Run the scripts in this order:
 1. `preprocessing.py` includes... well, downloading and preprocessing the data. It uses `CrushSet` as a custom `DataSet`.
-2. `train.py` for training the model. It uses a custom `TwoRabbitsHunter(nn.Module)` to train the model, which has a 2-layer shared body plus two small MLPs - one for regression and one for classification.
+2. `train.py` for training the model. It uses a custom `TwoRabbitsHunter(nn.Module)` to train the model, which has a 2-layer shared body plus two small MLPs - one for regression and one for classification. Running this script will save the trained model at `tmp/TwoRabbitsHunter.pth`
+3. `evaluation.py` is optional, bu recommended for evaluation & analysis.
