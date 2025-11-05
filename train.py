@@ -3,23 +3,24 @@ import os
 import pandas as pd
 import torch
 import torch.nn as nn
+from collections import Counter
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from CrushSet import CrushSet
 from TwoRabbitsHunter import TwoRabbitsHunter
 
 
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-X_train_encoded = pd.read_csv('tmp/X_train_encoded.csv')
-X_test_encoded = pd.read_csv('tmp/X_test_encoded.csv')
-y_train = pd.read_csv('tmp/y_train.csv')
-y_test = pd.read_csv('tmp/y_test.csv')
+X_train_encoded = pd.read_csv("tmp/X_train_encoded.csv")
+X_test_encoded = pd.read_csv("tmp/X_test_encoded.csv")
+y_train = pd.read_csv("tmp/y_train.csv")
+y_test = pd.read_csv("tmp/y_test.csv")
 
 # Split train into train and validation sets (80/20 split of training data)
-X_train_final, X_val, y_train_final, y_val = train_test_split(X_train_encoded, y_train, test_size=0.2, random_state=95, stratify=y_train['romantic'])
+X_train_final, X_val, y_train_final, y_val = train_test_split(X_train_encoded, y_train, test_size=0.2, random_state=95, stratify=y_train["romantic"])
 
 # Create Dataset instances
 train_dataset = CrushSet(X_train_final, y_train_final)
@@ -29,16 +30,25 @@ val_dataset = CrushSet(X_val, y_val)
 # Create DataLoaders
 BS = 32  # yeah, let's go with the default batch size
 
-train_loader = DataLoader(train_dataset, batch_size=BS, shuffle=True)
+# Compute weights for class imbalance
+romantic_labels = [int(y) for _, _, y in train_dataset]
+class_counts = Counter(romantic_labels)
+total = sum(class_counts.values())
+weights = [total / class_counts[i] for i in range(2)]  # [weight for 0, weight for 1]
+sample_weights = [weights[y] for y in romantic_labels]
+sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
+
+train_loader = DataLoader(train_dataset, batch_size=BS, sampler=sampler)
 val_loader = DataLoader(val_dataset, batch_size=BS, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=BS, shuffle=False)
 
 # Initialize model, model parameters, loss functions, and optimizer
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # Unfortunately, I have never had a CUDA-supported personal computer, except for the time I ran my FIRST EVER DISTRIBUTED PROGRAM ON EUROPE'S CURRENT LARGEST SUPERCOMPUTER — JUPYTER (during my summer 2025 internship).
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Unfortunately, I have never had a CUDA-supported personal computer, except for the time I ran my FIRST EVER DISTRIBUTED PROGRAM ON EUROPE'S CURRENT LARGEST SUPERCOMPUTER — JUPYTER (during my summer 2025 internship).
 model = TwoRabbitsHunter(input_size=X_train_encoded.shape[1]).to(device)
 
 regression_loss_fn = nn.MSELoss()  # For grade prediction (G3)
-classification_loss_fn = nn.CrossEntropyLoss()  # For romantic status
+class_weights = torch.tensor(weights, dtype=torch.float).to(device)
+classification_loss_fn = nn.CrossEntropyLoss(weight=class_weights)  # For romantic status
 
 learning_rate = 0.0005
 weight_decay = 1e-4
@@ -121,7 +131,7 @@ for epoch in range(epochs):
 
 logger.info("Training completed!")
 os.makedirs('tmp', exist_ok=True)
-torch.save(model.state_dict(), 'tmp/TwoRabbitsHunter.pth')  # Saving the model in PyTorch format
+torch.save(model.state_dict(), "tmp/TwoRabbitsHunter.pth")  # Saving the model in PyTorch format
 logger.info("Model saved to 'tmp/TwoRabbitsHunter.pth'")
 
 # final evaluation on test set

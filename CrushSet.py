@@ -13,8 +13,8 @@ class CrushSet(Dataset):
             y: (n_samples, 2) -> targets DataFrame containing both 'G3' and 'romantic' columns
         """
         self.X = torch.FloatTensor(X.values)
-        self.y_G3 = torch.FloatTensor(y['G3'].values)
-        self.y_romantic = torch.LongTensor((y['romantic'] == 'yes').astype(int).values)
+        self.y_G3 = torch.FloatTensor(y["G3"].values)
+        self.y_romantic = torch.LongTensor((y["romantic"] == "yes").astype(int).values)
 
     def __len__(self):
         return len(self.X)
