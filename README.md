@@ -24,3 +24,4 @@ and install requirements with:
 Run the scripts in this order:
 1. `preprocessing.py` includes... well, downloading and preprocessing the data. It uses `CrushSet` as a custom `DataSet`.
 2. `train.py` for training the model. It uses a custom `TwoRabbitsHunter(nn.Module)` to train the model, which has a 2-layer shared body plus two small MLPs - one for regression and one for classification.
+3. `evaluatiom.py` for evaluating the model and plotting train vs test metrics graphs.

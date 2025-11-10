@@ -1,6 +1,7 @@
 import logging
 import os
 import pandas as pd
+import pickle
 import torch
 import torch.nn as nn
 
@@ -17,28 +18,28 @@ logger = logging.getLogger(__name__)
 
 
 def train_model(alpha):
-    logger.info(f"\n{'=' * 60}")
+    logger.info("=" * 50)
     logger.info(f"Training model with alpha = {alpha}")
-    logger.info(f"{'=' * 60}")
+    logger.info("=" * 50)
 
-    # Load data
+    # load data
     X_train_encoded = pd.read_csv("tmp/X_train_encoded.csv")
     X_test_encoded = pd.read_csv("tmp/X_test_encoded.csv")
     y_train = pd.read_csv("tmp/y_train.csv")
     y_test = pd.read_csv("tmp/y_test.csv")
 
-    # Split train into train and validation sets
+    # split train into train and validation sets
     X_train_final, X_val, y_train_final, y_val = train_test_split(X_train_encoded, y_train, test_size=0.2, random_state=95, stratify=y_train["romantic"])
 
-    # Create Dataset instances
+    # create Dataset instances
     train_dataset = CrushSet(X_train_final, y_train_final)
     test_dataset = CrushSet(X_test_encoded, y_test)
     val_dataset = CrushSet(X_val, y_val)
 
-    # Create DataLoaders
+    # create DataLoaders
     BS = 32
 
-    # Compute weights for class imbalance
+    # compute weights for class imbalance
     romantic_labels = [int(y) for _, _, y in train_dataset]
     class_counts = Counter(romantic_labels)
     total = sum(class_counts.values())
@@ -50,8 +51,8 @@ def train_model(alpha):
     val_loader = DataLoader(val_dataset, batch_size=BS, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=BS, shuffle=False)
 
-    # Initialize model
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # model initialization
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Unfortunately, I have never had a CUDA-supported personal computer, except for the time I ran my FIRST EVER DISTRIBUTED PROGRAM ON EUROPE'S CURRENT LARGEST SUPERCOMPUTER — JUPYTER (during my summer 2025 internship).
     model = TwoRabbitsHunter(input_size=X_train_encoded.shape[1]).to(device)
 
     regression_loss_fn = nn.MSELoss()
@@ -67,7 +68,15 @@ def train_model(alpha):
     logger.info(f"Alpha (G3 weight): {alpha}")
     logger.info(f"Using device: {device}")
 
-    # Training loop
+    # lists to track metrics for plotting
+    train_total_losses = []
+    train_G3_losses = []
+    train_romantic_losses = []
+    val_total_losses = []
+    val_G3_losses = []
+    val_romantic_losses = []
+
+    # training loop
     for epoch in range(epochs):
         model.train()
         train_G3_loss = 0.0
@@ -100,7 +109,11 @@ def train_model(alpha):
         avg_train_romantic = train_romantic_loss / train_batches
         avg_train_total = train_total_loss / train_batches
 
-        # Validation phase
+        train_total_losses.append(avg_train_total)
+        train_G3_losses.append(avg_train_G3)
+        train_romantic_losses.append(avg_train_romantic)
+
+        # validation
         model.eval()
         val_G3_loss = 0.0
         val_romantic_loss = 0.0
@@ -128,18 +141,22 @@ def train_model(alpha):
         avg_val_G3 = val_G3_loss / val_batches
         avg_val_romantic = val_romantic_loss / val_batches
 
+        val_total_losses.append(avg_val_total)
+        val_G3_losses.append(avg_val_G3)
+        val_romantic_losses.append(avg_val_romantic)
+
         if (epoch + 1) % 10 == 0:
             logger.info(f"Epoch [{epoch + 1}/{epochs}]")
             logger.info(f"  Train -> Total: {avg_train_total:.3f}, G3: {avg_train_G3:.3f}, Romantic: {avg_train_romantic:.3f}")
             logger.info(f"  Val -> Total: {avg_val_total:.3f}, G3: {avg_val_G3:.3f}, Romantic: {avg_val_romantic:.3f}")
 
-    # Save model with alpha in filename
+    # save model
     os.makedirs('tmp', exist_ok=True)
     model_filename = f"tmp/TwoRabbitsHunter_{alpha}.pth"
     torch.save(model.state_dict(), model_filename)
     logger.info(f"Model saved to '{model_filename}'")
 
-    # Final evaluation on test set
+    # final evaluation on test set
     model.eval()
     test_G3_loss = 0.0
     test_romantic_loss = 0.0
@@ -166,14 +183,30 @@ def train_model(alpha):
     logger.info(f"Final Test Results for alpha={alpha}:")
     logger.info(f"Test -> Total: {test_total_loss / test_batches:.3f}, G3: {test_G3_loss / test_batches:.3f}, Romantic: {test_romantic_loss / test_batches:.3f}")
 
-    return model
+    # saving metrics for plotting
+    metrics = {
+        'train_total': train_total_losses,
+        'train_G3': train_G3_losses,
+        'train_romantic': train_romantic_losses,
+        'val_total': val_total_losses,
+        'val_G3': val_G3_losses,
+        'val_romantic': val_romantic_losses
+    }
 
+    metrics_filename = f"tmp/metrics_alpha_{alpha}.pkl"
+    with open(metrics_filename, 'wb') as f:
+        pickle.dump(metrics, f)
+    logger.info(f"Training metrics saved to '{metrics_filename}'")
+
+    return model, metrics
 
 
 if __name__ == "__main__":
     alpha_values = [0.3, 0.5, 0.7]
+    models = {}
+    model_metrics = {}
 
-    for alpha in alpha_values:
-        train_model(alpha)
+    for i, alpha in enumerate(alpha_values):
+        models[alpha], model_metrics[alpha] = train_model(alpha)
 
     logger.info("All training completed!")
