@@ -184,7 +184,7 @@ def train_model(alpha):
     logger.info(f"Test -> Total: {test_total_loss / test_batches:.3f}, G3: {test_G3_loss / test_batches:.3f}, Romantic: {test_romantic_loss / test_batches:.3f}")
 
     # saving metrics for plotting
-    metrics = {
+    metrics: dict[str, list[float]] = {
         'train_total': train_total_losses,
         'train_G3': train_G3_losses,
         'train_romantic': train_romantic_losses,

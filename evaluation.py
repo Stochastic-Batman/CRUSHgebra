@@ -14,7 +14,7 @@ from CrushSet import CrushSet
 
 
 
-# lines 14-21 do not need to be repeated in jupyter.ipynb
+# lines 18-25 do not need to be repeated in jupyter.ipynb
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,7 +34,6 @@ def evaluate_model(alpha):
     model.load_state_dict(torch.load(f"tmp/TwoRabbitsHunter_{alpha}.pth", map_location=device))
     model.eval()
 
-    # Define loss functions (same as in training)
     regression_loss_fn = nn.MSELoss()
     with open(f"tmp/metrics_alpha_{alpha}.pkl", 'rb') as f:
         train_data = pickle.load(f)
@@ -46,10 +45,9 @@ def evaluate_model(alpha):
     all_romantic_preds = []
     all_romantic_true = []
 
-    test_total_loss = 0.0
-    test_G3_loss = 0.0
-    test_romantic_loss = 0.0
-    test_batches = 0
+    test_total_losses = []
+    test_G3_losses = []
+    test_romantic_losses = []
 
     with torch.no_grad():
         for batch_X, batch_G3, batch_romantic in test_loader:
@@ -63,6 +61,10 @@ def evaluate_model(alpha):
             romantic_loss = classification_loss_fn(romantic_logits, batch_romantic)
             total_loss = alpha * G3_loss + (1 - alpha) * romantic_loss
 
+            test_total_losses.append(total_loss.item())
+            test_G3_losses.append(G3_loss.item())
+            test_romantic_losses.append(romantic_loss.item())
+
             all_G3_preds.extend(G3_pred.squeeze().cpu().numpy())
             all_G3_true.extend(batch_G3.cpu().numpy())
 
@@ -70,23 +72,15 @@ def evaluate_model(alpha):
             all_romantic_preds.extend(romantic_pred_classes.cpu().numpy())
             all_romantic_true.extend(batch_romantic.cpu().numpy())
 
-            test_total_loss += total_loss.item()
-            test_G3_loss += G3_loss.item()
-            test_romantic_loss += romantic_loss.item()
-            test_batches += 1
+    avg_test_total = sum(test_total_losses) / len(test_total_losses)
+    avg_test_G3 = sum(test_G3_losses) / len(test_G3_losses)
+    avg_test_romantic = sum(test_romantic_losses) / len(test_romantic_losses)
 
-    # avg losses
-    avg_test_total = test_total_loss / test_batches
-    avg_test_G3 = test_G3_loss / test_batches
-    avg_test_romantic = test_romantic_loss / test_batches
-
-    # convert to numpy arrays
     all_G3_preds = np.array(all_G3_preds)
     all_G3_true = np.array(all_G3_true)
     all_romantic_preds = np.array(all_romantic_preds)
     all_romantic_true = np.array(all_romantic_true)
 
-    # group all calculations together
     mae_G3 = mean_absolute_error(all_G3_true, all_G3_preds)
     accuracy_romantic = accuracy_score(all_romantic_true, all_romantic_preds)
     f1_romantic_yes = f1_score(all_romantic_true, all_romantic_preds, pos_label=1)
@@ -101,18 +95,20 @@ def evaluate_model(alpha):
     logger.info("=" * 50)
     logger.info(f"SUMMARY FOR ALPHA = {alpha}")
     logger.info("=" * 50)
-    logger.info(f"Grade Prediction MAE: {mae_G3:.3f} points")
+    logger.info(f"G3 Prediction MAE: {mae_G3:.3f} points")
     logger.info(f"Interpretation: On average, predictions are off by {mae_G3:.3f} points (out of 20)")
     logger.info(f"Romantic Accuracy: {accuracy_romantic:.3f} ({accuracy_romantic * 100:.1f}%)")
     logger.info(f"Romantic F1-Score for 'yes' class: {f1_romantic_yes:.3f}")
     logger.info(f"Romantic F1-Score for 'no' class: {f1_romantic_no:.3f}")
     logger.info("=" * 50)
 
-    # returning metrics for plotting
-    metrics = {
+    metrics: dict[str, float | list[float] | dict] = {
         'test_total_loss': avg_test_total,
         'test_G3_loss': avg_test_G3,
         'test_romantic_loss': avg_test_romantic,
+        'test_total_losses': test_total_losses,
+        'test_G3_losses': test_G3_losses,
+        'test_romantic_losses': test_romantic_losses,
         'mae_G3': mae_G3,
         'accuracy_romantic': accuracy_romantic,
         'f1_romantic_yes': f1_romantic_yes,
@@ -123,7 +119,8 @@ def evaluate_model(alpha):
     return metrics
 
 
-def plot_train_vs_test_comparison(alpha, test_metrics):  # this method was written by DeepSeek, as I am not great with plotting
+# DeepSeek was used to generate this method
+def plot_train_vs_test_comparison(alpha, test_metrics, save_plot=True):
     try:
         with open(f"tmp/metrics_alpha_{alpha}.pkl", 'rb') as f:
             train_data = pickle.load(f)
@@ -131,7 +128,49 @@ def plot_train_vs_test_comparison(alpha, test_metrics):  # this method was writt
         logger.error(f"Metrics file for alpha={alpha} not found. Run training first.")
         return
 
-    # Use the last epoch's values for training and validation
+    plt.style.use('dark_background')
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    epochs = range(1, len(train_data['train_total']) + 1)
+
+    axes[0].plot(epochs, train_data['train_total'], 'purple', linewidth=2, label='Training')
+    axes[0].plot(epochs, train_data['val_total'], 'lime', linewidth=2, label='Validation')
+    axes[0].axhline(y=test_metrics['test_total_loss'], color='cyan', linestyle='--', linewidth=2, label='Test')
+    axes[0].set_title(f'Total Loss (Alpha={alpha})')
+    axes[0].set_xlabel('Epoch')
+    axes[0].set_ylabel('Loss')
+    axes[0].legend()
+    axes[0].grid(True, alpha=0.3)
+
+    axes[1].plot(epochs, train_data['train_G3'], 'purple', linewidth=2, label='Training')
+    axes[1].plot(epochs, train_data['val_G3'], 'lime', linewidth=2, label='Validation')
+    axes[1].axhline(y=test_metrics['test_G3_loss'], color='cyan', linestyle='--', linewidth=2, label='Test')
+    axes[1].set_title(f'G3 Loss (Alpha={alpha})')
+    axes[1].set_xlabel('Epoch')
+    axes[1].set_ylabel('Loss')
+    axes[1].legend()
+    axes[1].grid(True, alpha=0.3)
+
+    axes[2].plot(epochs, train_data['train_romantic'], 'purple', linewidth=2, label='Training')
+    axes[2].plot(epochs, train_data['val_romantic'], 'lime', linewidth=2, label='Validation')
+    axes[2].axhline(y=test_metrics['test_romantic_loss'], color='cyan', linestyle='--', linewidth=2, label='Test')
+    axes[2].set_title(f'Romantic Loss (Alpha={alpha})')
+    axes[2].set_xlabel('Epoch')
+    axes[2].set_ylabel('Loss')
+    axes[2].legend()
+    axes[2].grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    if save_plot:
+        os.makedirs('tmp', exist_ok=True)
+        plot_filename = f"tmp/train_val_test_losses_alpha_{alpha}.png"
+        plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
+        plt.close()
+        logger.info(f"Training vs Validation vs Test loss curves saved to '{plot_filename}'")
+    else:
+        plt.show()
+
     final_train = {
         'total_loss': train_data['train_total'][-1],
         'G3_loss': train_data['train_G3'][-1],
@@ -143,53 +182,8 @@ def plot_train_vs_test_comparison(alpha, test_metrics):  # this method was writt
         'romantic_loss': train_data['val_romantic'][-1]
     }
 
-    # Prepare data for plotting
-    categories = ['Total Loss', 'G3 Loss', 'Romantic Loss']
-    train_values = [final_train['total_loss'], final_train['G3_loss'], final_train['romantic_loss']]
-    val_values = [final_val['total_loss'], final_val['G3_loss'], final_val['romantic_loss']]
-    test_values = [test_metrics['test_total_loss'], test_metrics['test_G3_loss'], test_metrics['test_romantic_loss']]
-
-    # Create comparison plot
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    x_pos = np.arange(len(categories))
-    width = 0.25
-
-    bars1 = ax.bar(x_pos - width, train_values, width, label='Training', alpha=0.8, color='blue')
-    bars2 = ax.bar(x_pos, val_values, width, label='Validation', alpha=0.8, color='orange')
-    bars3 = ax.bar(x_pos + width, test_values, width, label='Test', alpha=0.8, color='green')
-
-    ax.set_xlabel('Loss Type')
-    ax.set_ylabel('Loss Value')
-    ax.set_title(f'Training vs Validation vs Test Loss Comparison (Alpha = {alpha})')
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(categories)
-    ax.legend()
-    ax.grid(True, alpha=0.3, axis='y')
-
-    # Add value labels on bars
-    for bars in [bars1, bars2, bars3]:
-        for bar in bars:
-            height = bar.get_height()
-            ax.annotate(f'{height:.3f}',
-                        xy=(bar.get_x() + bar.get_width() / 2, height),
-                        xytext=(0, 3),  # 3 points vertical offset
-                        textcoords="offset points",
-                        ha='center', va='bottom', fontsize=8)
-
-    plt.tight_layout()
-
-    # Save the plot
-    os.makedirs('tmp', exist_ok=True)
-    plot_filename = f"tmp/train_vs_test_comparison_alpha_{alpha}.png"
-    plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
-    plt.close()
-
-    logger.info(f"Train vs Test comparison plot saved to '{plot_filename}'")
-
-    # Log the comparison
     logger.info("=" * 60)
-    logger.info(f"LOSS COMPARISON FOR ALPHA = {alpha}")
+    logger.info(f"FINAL LOSS COMPARISON FOR ALPHA = {alpha}")
     logger.info("=" * 60)
     logger.info("Total Loss:")
     logger.info(f"  Training: {final_train['total_loss']:.3f}")
@@ -216,6 +210,6 @@ if __name__ == "__main__":
     for alpha in alpha_values:
         test_metrics = evaluate_model(alpha)
         evaluated_metrics[alpha] = test_metrics
-        plot_train_vs_test_comparison(alpha, test_metrics)
+        plot_train_vs_test_comparison(alpha, test_metrics, save_plot=True)
 
     logger.info("All evaluation and comparison plotting completed!")
